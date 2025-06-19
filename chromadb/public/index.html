@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChromaDB MCP HTTP/SSE Server</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            backdrop-filter: blur(10px);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            border-bottom: 2px solid #f0f0f0;
+            padding-bottom: 20px;
+        }
+        .header h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+            font-weight: 300;
+        }
+        .header .subtitle {
+            color: #7f8c8d;
+            font-size: 1.1em;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .status.healthy {
+            background: linear-gradient(135deg, #a8e6cf 0%, #dcedc1 100%);
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.unhealthy {
+            background: linear-gradient(135deg, #ffa8a8 0%, #ffcccb 100%);
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 25px;
+            border: 1px solid #e9ecef;
+            border-radius: 10px;
+            background: #fafafa;
+        }
+        .section h2 {
+            margin-top: 0;
+            color: #495057;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 10px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        button.success {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        }
+        button.danger {
+            background: linear-gradient(135deg, #dc3545 0%, #fd7e14 100%);
+        }
+        .log {
+            background: #1e1e1e;
+            color: #f8f8f2;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 20px;
+            height: 400px;
+            overflow-y: auto;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+        .input-group {
+            margin-bottom: 15px;
+        }
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #495057;
+        }
+        textarea {
+            width: 100%;
+            height: 140px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            padding: 15px;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            font-size: 13px;
+            transition: border-color 0.3s ease;
+            resize: vertical;
+        }
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .info-box {
+            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+            border: 1px solid #90caf9;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        .info-box h3 {
+            margin-top: 0;
+            color: #1976d2;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            background: #667eea;
+            color: white;
+            border-radius: 4px;
+            font-size: 0.8em;
+            font-weight: 500;
+        }
+        .metrics {
+            display: flex;
+            gap: 20px;
+            margin-top: 15px;
+        }
+        .metric {
+            text-align: center;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            flex: 1;
+        }
+        .metric-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #667eea;
+        }
+        .metric-label {
+            font-size: 0.9em;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+        .connection-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+        .connection-indicator.connected {
+            background: #28a745;
+            box-shadow: 0 0 10px rgba(40, 167, 69, 0.5);
+        }
+        .connection-indicator.disconnected {
+            background: #dc3545;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔗 ChromaDB MCP Server</h1>
+            <div class="subtitle">HTTP/SSE Model Context Protocol Interface</div>
+        </div>
+        
+        <div class="info-box">
+            <h3>🚀 About this Server</h3>
+            <p>This is a production-ready HTTP/SSE wrapper for the ChromaDB Model Context Protocol server. It enables web applications and HTTP clients to interact with ChromaDB through the standardized MCP interface.</p>
+            <p>
+                <span class="badge">Framework:</span> Custom Express.js wrapper with Docker isolation<br>
+                <span class="badge">Transport:</span> HTTP + Server-Sent Events (SSE)<br>
+                <span class="badge">Backend:</span> ChromaDB vector database<br>
+                <span class="badge">Protocol:</span> Model Context Protocol (MCP) 2024-11-05
+            </p>
+        </div>
+        
+        <div class="grid">
+            <div class="section">
+                <h2>📊 Server Status</h2>
+                <div id="server-status" class="status">🔄 Checking...</div>
+                <div class="metrics">
+                    <div class="metric">
+                        <div class="metric-value" id="session-count">-</div>
+                        <div class="metric-label">Active Sessions</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-value" id="uptime">-</div>
+                        <div class="metric-label">Uptime</div>
+                    </div>
+                </div>
+                <button onclick="checkHealth()">🔄 Refresh Status</button>
+                <button onclick="viewSessions()">📋 View Sessions</button>
+                <button onclick="cleanup()" class="danger">🧹 Cleanup</button>
+            </div>
+
+            <div class="section">
+                <h2>🔌 MCP Connection</h2>
+                <div style="margin-bottom: 15px;">
+                    <span class="connection-indicator" id="connection-indicator"></span>
+                    <strong>Session:</strong> <span id="session-id">Not connected</span>
+                </div>
+                <button id="connect-btn" onclick="connectToMCP()" class="success">🔗 Connect via SSE</button>
+                <button id="disconnect-btn" onclick="disconnectFromMCP()" disabled class="danger">🔌 Disconnect</button>
+                <button id="send-init-btn" onclick="sendInitMessage()" disabled>🚀 Initialize</button>
+                <button id="list-tools-btn" onclick="listTools()" disabled>🛠️ List Tools</button>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>💬 Custom MCP Message</h2>
+            <div class="input-group">
+                <label for="message-input">JSON-RPC Message:</label>
+                <textarea id="message-input" placeholder='{"jsonrpc": "2.0", "id": 1, "method": "tools/list"}'></textarea>
+            </div>
+            <button id="send-custom-btn" onclick="sendCustomMessage()" disabled>📨 Send Message</button>
+            <button onclick="loadSampleMessages()">📄 Load Samples</button>
+        </div>
+
+        <div class="section">
+            <h2>📋 Event Log</h2>
+            <button onclick="clearLog()">🗑️ Clear Log</button>
+            <button onclick="exportLog()">💾 Export Log</button>
+            <div id="log" class="log"></div>
+        </div>
+    </div>
+
+    <script>
+        let eventSource = null;
+        let sessionId = null;
+        let messageIdCounter = 1;
+        let startTime = Date.now();
+
+        function updateConnectionIndicator(connected) {
+            const indicator = document.getElementById('connection-indicator');
+            indicator.className = `connection-indicator ${connected ? 'connected' : 'disconnected'}`;
+        }
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logElement = document.getElementById('log');
+            const emoji = type === 'error' ? '❌' : type === 'success' ? '✅' : type === 'send' ? '📤' : type === 'receive' ? '📥' : 'ℹ️';
+            logElement.textContent += `[${timestamp}] ${emoji} ${message}\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('log').textContent = '';
+            log('Log cleared', 'success');
+        }
+
+        function exportLog() {
+            const logContent = document.getElementById('log').textContent;
+            const blob = new Blob([logContent], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `chromadb-mcp-log-${new Date().toISOString().split('T')[0]}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            log('Log exported to file', 'success');
+        }
+
+        async function checkHealth() {
+            try {
+                const response = await fetch('/health');
+                const health = await response.json();
+                const statusElement = document.getElementById('server-status');
+                
+                if (health.status === 'healthy') {
+                    statusElement.className = 'status healthy';
+                    statusElement.innerHTML = `✅ Server healthy - ${health.activeSessions} active sessions`;
+                } else {
+                    statusElement.className = 'status unhealthy';
+                    statusElement.innerHTML = `❌ Server unhealthy`;
+                }
+                
+                document.getElementById('session-count').textContent = health.activeSessions;
+                document.getElementById('uptime').textContent = Math.round((Date.now() - startTime) / 1000) + 's';
+                
+                log(`Health check: ${health.status}, ${health.activeSessions} sessions`);
+            } catch (error) {
+                const statusElement = document.getElementById('server-status');
+                statusElement.className = 'status unhealthy';
+                statusElement.innerHTML = `❌ Failed to connect to server`;
+                log(`Health check failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function viewSessions() {
+            try {
+                const response = await fetch('/sessions');
+                const data = await response.json();
+                log(`Active sessions (${data.total}):`);
+                data.sessions.forEach(session => {
+                    log(`  - ${session.sessionId} (${session.uptime}s)`);
+                });
+            } catch (error) {
+                log(`Failed to fetch sessions: ${error.message}`, 'error');
+            }
+        }
+
+        async function cleanup() {
+            if (!confirm('Are you sure you want to terminate all active sessions?')) return;
+            
+            try {
+                const response = await fetch('/cleanup', { method: 'POST' });
+                const result = await response.json();
+                log(result.message, 'success');
+                checkHealth();
+            } catch (error) {
+                log(`Cleanup failed: ${error.message}`, 'error');
+            }
+        }
+
+        function connectToMCP() {
+            if (eventSource) {
+                log('Already connected', 'error');
+                return;
+            }
+
+            log('Connecting to MCP server via SSE...', 'send');
+            eventSource = new EventSource('/mcp');
+
+            eventSource.onopen = () => {
+                log('SSE connection opened', 'success');
+                updateConnectionIndicator(true);
+            };
+
+            eventSource.addEventListener('connected', (event) => {
+                const data = JSON.parse(event.data);
+                sessionId = data.sessionId;
+                document.getElementById('session-id').textContent = sessionId;
+                document.getElementById('connect-btn').disabled = true;
+                document.getElementById('disconnect-btn').disabled = false;
+                document.getElementById('send-init-btn').disabled = false;
+                document.getElementById('send-custom-btn').disabled = false;
+                log(`Connected with session ID: ${sessionId}`, 'success');
+                checkHealth();
+            });
+
+            eventSource.addEventListener('message', (event) => {
+                const data = JSON.parse(event.data);
+                if (data.type === 'stdout') {
+                    try {
+                        const mcpMessage = JSON.parse(data.content);
+                        log(`MCP Response: ${JSON.stringify(mcpMessage, null, 2)}`, 'receive');
+                        
+                        // Enable tools list button after successful initialization
+                        if (mcpMessage.result && mcpMessage.result.capabilities) {
+                            document.getElementById('list-tools-btn').disabled = false;
+                        }
+                    } catch (e) {
+                        log(`MCP stdout: ${data.content}`, 'receive');
+                    }
+                } else if (data.type === 'stderr') {
+                    log(`MCP stderr: ${data.content}`);
+                }
+            });
+
+            eventSource.addEventListener('close', (event) => {
+                const data = JSON.parse(event.data);
+                log(`MCP process closed with code: ${data.code}`, 'error');
+                resetConnection();
+            });
+
+            eventSource.addEventListener('error', (event) => {
+                const data = JSON.parse(event.data);
+                log(`MCP process error: ${data.error}`, 'error');
+                resetConnection();
+            });
+
+            eventSource.onerror = (error) => {
+                log(`SSE error: ${error}`, 'error');
+                resetConnection();
+            };
+        }
+
+        function disconnectFromMCP() {
+            if (eventSource) {
+                eventSource.close();
+                log('Disconnected from MCP server', 'success');
+            }
+            resetConnection();
+        }
+
+        function resetConnection() {
+            eventSource = null;
+            sessionId = null;
+            updateConnectionIndicator(false);
+            document.getElementById('session-id').textContent = 'Not connected';
+            document.getElementById('connect-btn').disabled = false;
+            document.getElementById('disconnect-btn').disabled = true;
+            document.getElementById('send-init-btn').disabled = true;
+            document.getElementById('list-tools-btn').disabled = true;
+            document.getElementById('send-custom-btn').disabled = true;
+            checkHealth();
+        }
+
+        async function sendMessage(message) {
+            if (!sessionId) {
+                log('Not connected to MCP server', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/mcp/${sessionId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    log(`Message sent: ${JSON.stringify(message)}`, 'send');
+                } else {
+                    log(`Failed to send message: ${result.error}`, 'error');
+                }
+            } catch (error) {
+                log(`Error sending message: ${error.message}`, 'error');
+            }
+        }
+
+        function sendInitMessage() {
+            const initMessage = {
+                jsonrpc: "2.0",
+                id: messageIdCounter++,
+                method: "initialize",
+                params: {
+                    protocolVersion: "2024-11-05",
+                    capabilities: {
+                        roots: { listChanged: true }
+                    },
+                    clientInfo: {
+                        name: "chromadb-mcp-web-client",
+                        version: "1.0.0"
+                    }
+                }
+            };
+            sendMessage(initMessage);
+        }
+
+        function listTools() {
+            const toolsMessage = {
+                jsonrpc: "2.0",
+                id: messageIdCounter++,
+                method: "tools/list"
+            };
+            sendMessage(toolsMessage);
+        }
+
+        function sendCustomMessage() {
+            const messageInput = document.getElementById('message-input');
+            try {
+                const message = JSON.parse(messageInput.value);
+                sendMessage(message);
+            } catch (error) {
+                log(`Invalid JSON: ${error.message}`, 'error');
+            }
+        }
+
+        function loadSampleMessages() {
+            const samples = [
+                {
+                    name: "List Tools",
+                    message: { "jsonrpc": "2.0", "id": 1, "method": "tools/list" }
+                },
+                {
+                    name: "Create Collection",
+                    message: {
+                        "jsonrpc": "2.0",
+                        "id": 2,
+                        "method": "tools/call",
+                        "params": {
+                            "name": "chroma_create_collection",
+                            "arguments": {
+                                "collection_name": "test_collection",
+                                "embedding_function": "default"
+                            }
+                        }
+                    }
+                },
+                {
+                    name: "List Collections",
+                    message: {
+                        "jsonrpc": "2.0",
+                        "id": 3,
+                        "method": "tools/call",
+                        "params": {
+                            "name": "chroma_list_collections"
+                        }
+                    }
+                }
+            ];
+
+            const choice = prompt(`Select a sample message:\n${samples.map((s, i) => `${i + 1}. ${s.name}`).join('\n')}`);
+            const index = parseInt(choice) - 1;
+            
+            if (index >= 0 && index < samples.length) {
+                document.getElementById('message-input').value = JSON.stringify(samples[index].message, null, 2);
+                log(`Loaded sample: ${samples[index].name}`, 'success');
+            }
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            updateConnectionIndicator(false);
+            checkHealth();
+            
+            // Set a default message
+            document.getElementById('message-input').value = JSON.stringify({
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/list"
+            }, null, 2);
+
+            // Auto-refresh health every 30 seconds
+            setInterval(checkHealth, 30000);
+        });
+    </script>
+</body>
+</html>
