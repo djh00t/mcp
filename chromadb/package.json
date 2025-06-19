@@ -1,0 +1,49 @@
+{
+  "name": "chromadb-mcp-http",
+  "version": "1.0.0",
+  "description": "HTTP/SSE wrapper for ChromaDB MCP server - A production-ready solution for accessing ChromaDB via Model Context Protocol over HTTP and Server-Sent Events",
+  "type": "module",
+  "main": "src/http-wrapper.js",
+  "scripts": {
+    "start": "node src/http-wrapper.js",
+    "dev": "node --watch src/http-wrapper.js",
+    "test": "node test/test-client.js",
+    "docker:build": "docker compose build",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "chromadb",
+    "vector-database",
+    "http",
+    "sse",
+    "server-sent-events",
+    "wrapper",
+    "ai",
+    "embeddings"
+  ],
+  "author": "djh00t",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "express": "^4.18.0"
+  },
+  "devDependencies": {
+    "eventsource": "^4.0.0",
+    "node-fetch": "^3.3.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/djh00t/mcp"
+  },
+  "bugs": {
+    "url": "https://github.com/djh00t/mcp/issues"
+  },
+  "homepage": "https://github.com/djh00t/mcp/tree/main/chromadb"
+}
