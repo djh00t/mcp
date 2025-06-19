@@ -1,0 +1,40 @@
+services:
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: chromadb
+    volumes:
+      - chromadb_data:/chroma/chroma
+    ports:
+      - "8003:8000"
+    environment:
+      - IS_PERSISTENT=TRUE
+      - PERSIST_DIRECTORY=/chroma/chroma
+    restart: unless-stopped
+    
+  chroma-mcp-http:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: chroma-mcp-http
+    ports:
+      - "8002:8002"
+    depends_on:
+      - chromadb
+    restart: unless-stopped
+    environment:
+      - CHROMADB_HOST=chromadb
+      - CHROMADB_PORT=8000
+      - HTTP_PORT=8002
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  chromadb_data:
+    driver: local
+
+networks:
+  default:
+    name: chromadb-mcp
