@@ -28,7 +28,7 @@
   "author": "djh00t",
   "license": "MIT",
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@modelcontextprotocol/sdk": "^1.25.2",
     "express": "^4.18.0"
   },
   "devDependencies": {
